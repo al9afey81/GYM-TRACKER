@@ -11,6 +11,7 @@ const app=document.getElementById('app');
 const escapeHTML=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 // Older records were only approved after cardio completion; leave stored records intact.
 const cardioDone=d=>d.cardio!==false;
+const weekReady=w=>names.every((_,i)=>rest(i)||Boolean(w.days[i]?.iron));
 function save(next){
   try{localStorage.setItem(storageKey,JSON.stringify(next))}
   catch{storageOK=false;app.querySelector('[role="status"]').textContent='تعذر الحفظ الدائم في هذا المتصفح.';alert('تعذر حفظ البيانات. لم يتم اعتماد العملية؛ حاول مجددًا.');return}
@@ -27,24 +28,30 @@ function stats(w){
 }
 function dayMarkup(w,weekIndex,dayIndex){
   const d=w.days[dayIndex],editing=Boolean(d);
-  return `<details class="day" data-week="${weekIndex}" data-day="${dayIndex}"><summary class="${editing?'done':''}">${editing?'<span>✓</span> <span aria-label="تعديل اليوم">✎</span>':'○'} اليوم ${dayIndex+1} — ${names[dayIndex]}</summary>${editing?`<small>${escapeHTML(d.date)} | ${escapeHTML(d.type)} · ${d.minutes} دقيقة | معتمد</small>`:''}<form class="day-form" data-week="${weekIndex}" data-day="${dayIndex}"><label>التاريخ<input type="date" name="date" value="${escapeHTML(d?.date??today())}" required></label>${rest(dayIndex)&&!editing?'<p>راحة من الحديد</p>':`<label><input type="checkbox" name="iron" ${d?.iron?'checked':''} ${!editing?'required':''}> تم تمرين الحديد</label>`}<label><input type="checkbox" name="cardio" ${editing&&cardioDone(d)?'checked':''} ${!editing?'required':''}> تم الكارديو</label>${fields(d||{})}<button>${editing?'حفظ التعديلات':'اعتماد اليوم ✓'}</button></form></details>`;
+  return `<details class="day" data-week="${weekIndex}" data-day="${dayIndex}"><summary class="${editing?'done':''}">${editing?'<span>✓</span> <span aria-label="تعديل اليوم">✎</span>':'○'} اليوم ${dayIndex+1} — ${names[dayIndex]}</summary>${editing?`<small>${escapeHTML(d.date)} | ${cardioDone(d)?escapeHTML(d.type)+' · '+d.minutes+' دقيقة':'دون كارديو'} | معتمد</small>`:''}<form class="day-form" data-week="${weekIndex}" data-day="${dayIndex}"><label>التاريخ<input type="date" name="date" value="${escapeHTML(d?.date??today())}" required></label>${rest(dayIndex)&&!editing?'<p>راحة من الحديد</p>':`<label><input type="checkbox" name="iron" ${d?.iron?'checked':''} ${!editing?'required':''}> تم تمرين الحديد</label>`}<label><input type="checkbox" name="cardio" ${editing&&cardioDone(d)?'checked':''}> تم الكارديو (اختياري)</label>${fields(d||{})}<button>${editing?'حفظ التعديلات':'اعتماد اليوم ✓'}</button></form></details>`;
 }
 function render(){
   const n=state.weeks.length,w=state.weeks[n-1];
-  app.innerHTML=`<section data-stats-week="${n-1}"><h3>الأسبوع ${n}</h3>${stats(w)}${names.map((_,j)=>dayMarkup(w,n-1,j)).join('')}</section><details><summary>كارديو إضافي دون تقديم الجدول</summary><form id="extra"><label>التاريخ<input type="date" name="date" value="${today()}" required></label>${fields()}<button>حفظ الكارديو</button></form>${w.extra.map(d=>`<p>${escapeHTML(d.date)} | ${escapeHTML(d.type)} — ${d.minutes} دقيقة</p>`).join('')}</details><section><h3>الأسابيع السابقة</h3>${state.weeks.slice(0,-1).map((v,j)=>`<details class="archive" data-week="${j}" data-stats-week="${j}"><summary class="done">✓ الأسبوع ${j+1} — مكتمل</summary>${stats(v)}${names.map((_,k)=>dayMarkup(v,j,k)).join('')}${v.extra.map(d=>`<p>كارديو إضافي: ${escapeHTML(d.date)} | ${escapeHTML(d.type)} — ${d.minutes} دقيقة</p>`).join('')}</details>`).reverse().join('')||'<p class="muted">لا توجد أسابيع مكتملة بعد</p>'}</section><p class="muted" role="status">${storageOK?'الحفظ محلي على هذا المتصفح فقط.':'تعذر الحفظ الدائم في هذا المتصفح.'}</p>`;
+  app.innerHTML=`<section data-stats-week="${n-1}"><h3>الأسبوع ${n}</h3>${stats(w)}${names.map((_,j)=>dayMarkup(w,n-1,j)).join('')}${weekReady(w)?'<button id="finish-week">إنهاء الأسبوع والانتقال للأسبوع التالي</button>':''}</section><details><summary>كارديو إضافي دون تقديم الجدول</summary><form id="extra"><label>التاريخ<input type="date" name="date" value="${today()}" required></label>${fields()}<button>حفظ الكارديو</button></form>${w.extra.map(d=>`<p>${escapeHTML(d.date)} | ${escapeHTML(d.type)} — ${d.minutes} دقيقة</p>`).join('')}</details><section><h3>الأسابيع السابقة</h3>${state.weeks.slice(0,-1).map((v,j)=>`<details class="archive" data-week="${j}" data-stats-week="${j}"><summary class="done">✓ الأسبوع ${j+1} — مكتمل</summary>${stats(v)}${names.map((_,k)=>dayMarkup(v,j,k)).join('')}${v.extra.map(d=>`<p>كارديو إضافي: ${escapeHTML(d.date)} | ${escapeHTML(d.type)} — ${d.minutes} دقيقة</p>`).join('')}</details>`).reverse().join('')||'<p class="muted">لا توجد أسابيع مكتملة بعد</p>'}</section><p class="muted" role="status">${storageOK?'الحفظ محلي على هذا المتصفح فقط.':'تعذر الحفظ الدائم في هذا المتصفح.'}</p>`;
   app.querySelectorAll('details.day').forEach(el=>el.addEventListener('toggle',()=>{if(el.open)app.querySelectorAll('details.day[open]').forEach(other=>{if(other!==el)other.open=false})}));
-  app.querySelectorAll('.day-form').forEach(form=>form.onsubmit=e=>{
+  const finish=app.querySelector('#finish-week');
+  if(finish)finish.onclick=()=>{
+    if(n!==state.weeks.length||!weekReady(state.weeks[n-1]))return;
+    const next=JSON.parse(JSON.stringify(state));next.weeks.push(fresh());save(next);
+  };
+  app.querySelectorAll('.day-form').forEach(form=>{
+    const updateCardio=()=>{form.elements.minutes.disabled=!form.elements.cardio.checked};
+    form.elements.cardio.onchange=updateCardio;updateCardio();
+    form.onsubmit=e=>{
     e.preventDefault();
     const weekIndex=Number(form.dataset.week),dayIndex=Number(form.dataset.day),d=read(form),week=state.weeks[weekIndex];
     if(week.days.some((a,j)=>j!==dayIndex&&a?.date===d.date)){alert('تم اعتماد يوم تدريبي بهذا التاريخ مسبقًا');return}
     const next=JSON.parse(JSON.stringify(state));
     next.weeks[weekIndex].days[dayIndex]={...week.days[dayIndex],...d,iron:form.elements.iron?.checked??false,cardio:form.elements.cardio.checked};
-    // Only the active week's first complete approval can create a successor.
-    if(weekIndex===state.weeks.length-1&&!week.days.every(Boolean)&&next.weeks[weekIndex].days.every(Boolean))next.weeks.push(fresh());
     save(next);
-  });
+  }});
   document.getElementById('extra').onsubmit=e=>{e.preventDefault();const next=JSON.parse(JSON.stringify(state));next.weeks[n-1].extra.push(read(e.target));save(next)};
 }
-function read(form){const d=new FormData(form);return {date:d.get('date'),type:d.get('type'),minutes:Number(d.get('minutes'))}}
+function read(form){const d=new FormData(form);return {date:d.get('date'),type:d.get('type'),minutes:Number(form.elements.minutes.value)}}
 render();
 </script></html>
